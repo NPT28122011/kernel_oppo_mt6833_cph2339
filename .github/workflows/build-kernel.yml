@@ -48,13 +48,26 @@ jobs:
           echo "+" > .scmversion
           touch .scmversion
 
-      - name: Kiểm tra thư mục vendor và tạo Symlink phòng ngừa
+      - name: Tự động tải và thiết lập thư mục vendor (OPPO Modules)
         run: |
-          if [ -d "vendor" ]; then
-            echo "-> Đã tìm thấy thư mục vendor trong repo."
+          # Nếu thư mục vendor chưa có trong repo, GitHub Actions sẽ tự động kéo về
+          if [ ! -d "vendor" ]; then
+            echo "-> Thư mục vendor chưa có sẵn trong repo, đang tự động clone từ kho modules..."
+            git clone --depth=1 https://github.com/oppo-source/android_kernel_modules_oppo_mtk5g.git -b oppo/mtk_s_12.1 ../modules_vendor || \
+            git clone --depth=1 https://github.com/NPT28122011/android_kernel_modules_oppo_mtk5g.git -b oppo/mtk_s_12.1 ../modules_vendor
+
+            if [ -d "../modules_vendor/vendor" ]; then
+              cp -r ../modules_vendor/vendor ./vendor
+              echo "-> Đã nạp thành công thư mục vendor vào cây mã nguồn!"
+            else
+              echo "::error ::Không thể tìm thấy thư mục vendor trong kho modules!"
+              exit 1
+            fi
           else
-            echo "::warning ::Không tìm thấy thư mục vendor tại thư mục gốc repo!"
+            echo "-> Đã phát hiện thư mục vendor có sẵn trong repo."
           fi
+
+          # Tạo các symlink phòng ngừa lỗi đường dẫn của MediaTek và Oppo
           ln -sf "$(pwd)/vendor" "../vendor" || true
           ln -sf . kernel-4.14 || true
           ln -sf "$(pwd)" "../kernel-4.14" || true
