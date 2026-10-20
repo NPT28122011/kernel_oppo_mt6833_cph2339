@@ -34,7 +34,8 @@ jobs:
             curl \
             python3 \
             python-is-python3 \
-            cpio
+            cpio \
+            device-tree-compiler
 
       - name: Kéo mã nguồn Repo Kernel (Checkout Source)
         uses: actions/checkout@v4
@@ -54,7 +55,12 @@ jobs:
           else
             echo "::warning ::Không tìm thấy thư mục vendor tại thư mục gốc repo!"
           fi
+          # Chống lỗi Makefile lùi cấp tìm vendor
           ln -sf "$(pwd)/vendor" "../vendor" || true
+
+          # TUYỆT CHIÊU: Bẫy toàn diện đường dẫn cứng '../../../../kernel-4.14/' của Oppo
+          ln -sf . kernel-4.14 || true
+          ln -sf "$(pwd)" "../kernel-4.14" || true
 
       - name: Tải Toolchain chuẩn AOSP (Clang 11 r383902 & GCC 4.9)
         run: |
@@ -90,6 +96,9 @@ jobs:
 
       - name: Thực thi biên dịch nhân nhị phân (Compile Image.gz-dtb)
         run: |
+          # Chống báo xanh ảo khi lệnh make bị lỗi
+          set -o pipefail
+
           export PATH="${GITHUB_WORKSPACE}/toolchains/clang/bin:${GITHUB_WORKSPACE}/toolchains/gcc64/bin:${GITHUB_WORKSPACE}/toolchains/gcc32/bin:${PATH}"
 
           export ARCH=arm64
@@ -113,7 +122,7 @@ jobs:
         run: |
           mkdir -p output_artifacts
           
-          # Gom đúng file Image.gz-dtb
+          # Gom đúng file Image.gz-dtb nếu biên dịch thành công
           if [ -f "out/arch/arm64/boot/Image.gz-dtb" ]; then
             cp out/arch/arm64/boot/Image.gz-dtb output_artifacts/
             echo "-> Đã gom Image.gz-dtb thành công."
@@ -128,6 +137,7 @@ jobs:
           fi
 
       - name: Tải thành phẩm lên GitHub Artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: CPH2339-Kernel-Build
