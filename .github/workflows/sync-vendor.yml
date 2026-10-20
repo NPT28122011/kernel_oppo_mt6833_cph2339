@@ -1,0 +1,55 @@
+name: Sync vendor from modules repo
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync-vendor:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout kernel branch
+        uses: actions/checkout@v4
+        with:
+          ref: oppo/mtk_s_12.1
+          fetch-depth: 1
+
+      - name: Download source vendor
+        run: |
+          git clone --depth=1 \
+            --branch oppo/mtk_s_12.1 \
+            https://github.com/NPT28122011/android_kernel_modules_oppo_mtk5g.git \
+            source_modules
+
+          test -d source_modules/vendor
+
+      - name: Check large files
+        run: |
+          file=$(find source_modules/vendor -type f -size +100M -print -quit)
+
+          if [ -n "$file" ]; then
+            echo "File exceeds 100 MiB: $file"
+            exit 1
+          fi
+
+      - name: Copy and push vendor
+        run: |
+          rm -rf vendor
+          cp -a source_modules/vendor ./vendor
+
+          git add -f vendor/
+
+          if git diff --cached --quiet; then
+            echo "No vendor changes to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git commit -m "Sync vendor modules"
+          git push origin HEAD:oppo/mtk_s_12.1
