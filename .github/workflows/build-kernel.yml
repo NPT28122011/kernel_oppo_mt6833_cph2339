@@ -43,14 +43,8 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
-      - name: Thiết lập chuỗi Vermagic chuẩn (4.14.186+)
-        run: |
-          echo "+" > .scmversion
-          touch .scmversion
-
       - name: Tự động tải và thiết lập thư mục vendor (OPPO Modules)
         run: |
-          # Nếu thư mục vendor chưa có trong repo, GitHub Actions sẽ tự động kéo về
           if [ ! -d "vendor" ]; then
             echo "-> Thư mục vendor chưa có sẵn trong repo, đang tự động clone từ kho modules..."
             git clone --depth=1 https://github.com/oppo-source/android_kernel_modules_oppo_mtk5g.git -b oppo/mtk_s_12.1 ../modules_vendor || \
@@ -76,6 +70,15 @@ jobs:
         run: |
           curl -LSs "https://raw.githubusercontent.com/Baka-SU/BakaSU/main/kernel/setup.sh" | bash -
 
+      - name: Bảo toàn Vermagic chuẩn xác "4.14.186+" (Triệt tiêu bẫy Dirty Tree)
+        run: |
+          # 1. Tạo file .scmversion chỉ chứa duy nhất dấu cộng
+          printf "+" > .scmversion
+
+          # 2. Vô hiệu hóa việc scripts/setlocalversion tự động gắn đuôi -dirty do BakaSU sửa code
+          sed -i 's/res="\$res\*"/\#res="\$res\*"/g' scripts/setlocalversion || true
+          sed -i 's/res="\$res-dirty"/\#res="\$res-dirty"/g' scripts/setlocalversion || true
+
       - name: Tải Toolchain chuẩn AOSP (Clang 11 r383902 & GCC 4.9)
         run: |
           mkdir -p "${GITHUB_WORKSPACE}/toolchains"
@@ -90,7 +93,7 @@ jobs:
           echo "-> Đang tải AOSP GCC 4.9 ARM32..."
           git clone --depth=1 https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9 -b android-10.0.0_r47 gcc32
 
-      - name: Khởi tạo cấu hình Kernel (make defconfig)
+      - name: Khởi tạo cấu hình Kernel từ defconfig của Operator
         run: |
           export PATH="${GITHUB_WORKSPACE}/toolchains/clang/bin:${GITHUB_WORKSPACE}/toolchains/gcc64/bin:${GITHUB_WORKSPACE}/toolchains/gcc32/bin:${PATH}"
 
@@ -102,11 +105,14 @@ jobs:
           export CROSS_COMPILE_ARM32=arm-linux-androideabi-
 
           mkdir -p out
+          printf "+" > out/.scmversion
+
+          # Nạp trực tiếp file k6833v1_64_defconfig đã chuẩn hóa thủ công từ VS Code
           make O=out ARCH=arm64 k6833v1_64_defconfig
 
-          # Ép chuẩn Vermagic trong file .config sinh ra
-          sed -i 's/CONFIG_LOCALVERSION_AUTO=y/# CONFIG_LOCALVERSION_AUTO is not set/' out/.config
-          sed -i 's/CONFIG_LOCALVERSION=".*"/CONFIG_LOCALVERSION=""/' out/.config
+          # Kiểm tra chuỗi Vermagic thực tế sinh ra
+          echo "=== KIỂM TRA CHUỖI KERNEL RELEASE SINH RA ==="
+          make O=out ARCH=arm64 kernelrelease
 
       - name: Thực thi biên dịch nhân nhị phân (Compile Image.gz-dtb)
         shell: bash
