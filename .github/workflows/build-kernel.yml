@@ -109,6 +109,10 @@ jobs:
 
           # Nạp trực tiếp file k6833v1_64_defconfig đã chuẩn hóa thủ công từ VS Code
           make O=out ARCH=arm64 k6833v1_64_defconfig
+                    # Cưỡng chế tắt các cờ gây lệch cấu trúc module Wi-Fi
+          sed -i 's/CONFIG_USER_NS=y/# CONFIG_USER_NS is not set/' out/.config
+          sed -i 's/CONFIG_SYSVIPC=y/# CONFIG_SYSVIPC is not set/' out/.config
+          sed -i 's/CONFIG_POSIX_MQUEUE=y/# CONFIG_POSIX_MQUEUE is not set/' out/.config
 
           # Kiểm tra chuỗi Vermagic thực tế sinh ra
           echo "=== KIỂM TRA CHUỖI KERNEL RELEASE SINH RA ==="
